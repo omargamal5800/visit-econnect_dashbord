@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة مؤشرات الزيارات الميدانية | Field Visits Dashboard 2026</title>
+  <!-- Tailwind CSS & Chart.js -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Cairo', 'Inter', sans-serif;
+      background-color: #0f172a;
+      color: #e2e8f0;
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 1rem;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.5);
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    .stat-glow {
+      box-shadow: 0 4px 20px -2px rgba(56, 189, 248, 0.15);
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 custom-scroll">
+
+  <!-- Top Header -->
+  <header class="flex flex-col md:flex-row items-start md:items-center justify-between pb-6 mb-6 border-b border-slate-700/60 gap-4">
+    <div>
+      <div class="flex items-center gap-3">
+        <span class="w-3.5 h-3.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-white">لوحة تحليلات الزيارات الميدانية 2026</h1>
+      </div>
+      <p class="text-slate-400 text-sm mt-1">تقرير تشغيلي وتحليلي شامل لمتابعة الصيانة، التركيبات، وأداء الفريق</p>
+    </div>
+
+    <!-- Quick Filters -->
+    <div class="flex flex-wrap items-center gap-2">
+      <select id="customerFilter" onchange="applyFilters()" class="bg-slate-800 border border-slate-700 text-sm rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500">
+        <option value="ALL">جميع العملاء</option>
+      </select>
+      <select id="categoryFilter" onchange="applyFilters()" class="bg-slate-800 border border-slate-700 text-sm rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500">
+        <option value="ALL">جميع أنواع الأعمال</option>
+      </select>
+      <button onclick="resetFilters()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-xs rounded-lg text-slate-300 transition">إعادة تعيين</button>
+    </div>
+  </header>
+
+  <!-- KPI Cards Row -->
+  <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
+    <div class="glass-card stat-glow p-4">
+      <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider">إجمالي الزيارات</div>
+      <div class="text-3xl font-bold text-white mt-2" id="kpi-total">0</div>
+      <div class="text-xs text-cyan-400 mt-1 flex items-center gap-1">
+        <span>ميداني وعن بُعد</span>
+      </div>
+    </div>
+
+    <div class="glass-card stat-glow p-4">
+      <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider">عمليات الصيانة</div>
+      <div class="text-3xl font-bold text-rose-400 mt-2" id="kpi-maintenance">0</div>
+      <div class="text-xs text-slate-400 mt-1" id="kpi-maintenance-pct">0% من الإجمالي</div>
+    </div>
+
+    <div class="glass-card stat-glow p-4">
+      <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider">التركيبات والتجهيز</div>
+      <div class="text-3xl font-bold text-emerald-400 mt-2" id="kpi-installs">0</div>
+      <div class="text-xs text-slate-400 mt-1" id="kpi-installs-pct">0% من الإجمالي</div>
+    </div>
+
+    <div class="glass-card stat-glow p-4">
+      <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider">عدد العملاء المخدومين</div>
+      <div class="text-3xl font-bold text-amber-400 mt-2" id="kpi-customers">0</div>
+      <div class="text-xs text-slate-400 mt-1">جهة وموقع</div>
+    </div>
+
+    <div class="glass-card stat-glow p-4 col-span-2 md:col-span-1">
+      <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider">استخدام السيارة (Car)</div>
+      <div class="text-3xl font-bold text-indigo-400 mt-2" id="kpi-car">0</div>
+      <div class="text-xs text-slate-400 mt-1" id="kpi-car-pct">0% من المأموريات</div>
+    </div>
+  </div>
+
+  <!-- Charts Row 1: Timeline & Category Breakdown -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <!-- Monthly Trend (2 Cols) -->
+    <div class="glass-card p-5 lg:col-span-2 flex flex-col justify-between">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-bold text-white flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-cyan-400"></span> التوزيع الزمني للزيارات عبر الأشهر
+        </h2>
+        <span class="text-xs text-slate-400">2026 Trend</span>
+      </div>
+      <div class="h-64">
+        <canvas id="timelineChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Category Donut (1 Col) -->
+    <div class="glass-card p-5 flex flex-col justify-between">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-bold text-white flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span> أنواع الأعمال والمهام
+        </h2>
+        <span class="text-xs text-slate-400">Category Mix</span>
+      </div>
+      <div class="h-64 relative flex items-center justify-center">
+        <canvas id="categoryChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Row 2: Customer Visits & Team Member Performance -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Top Customers Bar Chart -->
+    <div class="glass-card p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-bold text-white flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-amber-400"></span> أكثر العملاء طلباً للزيارات
+        </h2>
+        <span class="text-xs text-slate-400">Visits by Customer</span>
+      </div>
+      <div class="h-72">
+        <canvas id="customerChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Team Members Contribution -->
+    <div class="glass-card p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base font-bold text-white flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-indigo-400"></span> نشاط ومشاركات أفراد الفريق
+        </h2>
+        <span class="text-xs text-slate-400">Field Engineers & Techs</span>
+      </div>
+      <div class="h-72">
+        <canvas id="teamChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Visits Table -->
+  <div class="glass-card p-5">
+    <div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-2">
+      <h2 class="text-base font-bold text-white flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-rose-400"></span> جدول سجلات الزيارات والتذاكر
+      </h2>
+      <input type="text" id="searchInput" onkeyup="applyFilters()" placeholder="بحث باسم العميل، التذكرة، أو المشكلة..." class="bg-slate-800 border border-slate-700 text-xs rounded-lg px-3 py-2 text-slate-200 w-full md:w-72 focus:outline-none focus:border-cyan-500">
+    </div>
+    <div class="overflow-x-auto max-h-80 custom-scroll">
+      <table class="w-full text-right text-xs text-slate-300">
+        <thead class="bg-slate-800/80 sticky top-0 text-slate-400 font-semibold border-b border-slate-700">
+          <tr>
+            <th class="p-3">#</th>
+            <th class="p-3">التذكرة</th>
+            <th class="p-3">التاريخ</th>
+            <th class="p-3">العميل</th>
+            <th class="p-3">النوع</th>
+            <th class="p-3">المهمة</th>
+            <th class="p-3">الموقع</th>
+            <th class="p-3">الفريق المشارك</th>
+            <th class="p-3">المشكلة / الحل</th>
+            <th class="p-3">الحالة</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody" class="divide-y divide-slate-800/60">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const rawData = [{"no": 1, "ticket": "2601121", "date": "2026-01-12", "month": "Jan 2026", "month_num": 1, "customer": "EDITA", "type": "Visit", "category": "صيانة", "location": "Edita HQ - سنترال الشيخ زايد", "team": ["Belel", "Belal Hosny", "Fawzy"], "car": true, "problem": "link down", "solved": "not solved في انتظار تصريح دخول السنترال", "status": "قيد الانتظار / معلق"}, {"no": 2, "ticket": "2601202", "date": "2026-01-20", "month": "Jan 2026", "month_num": 1, "customer": "EDITA", "type": "Visit", "category": "صيانة", "location": "Edita HQ - سنترال الشيخ زايد", "team": ["Belel", "Belal Hosny", "Fawzy"], "car": true, "problem": "link down", "solved": "Reset The Device And change Fr And Power", "status": "تمت الزيارة"}, {"no": 3, "ticket": "2602103", "date": "2026-02-10", "month": "Feb 2026", "month_num": 2, "customer": "GB", "type": "Remotely", "category": "صيانة", "location": "Prima", "team": [], "car": false, "problem": "Check all links", "solved": "", "status": "تمت الزيارة"}, {"no": 4, "ticket": "2602184", "date": "2026-02-18", "month": "Feb 2026", "month_num": 2, "customer": "GB", "type": "Visit", "category": "صيانة", "location": "prima - سنترال قليوب", "team": ["Belel", "Belal Hosny", "Fawzy"], "car": true, "problem": "link down", "solved": "change Fr and Config", "status": "تمت الزيارة"}, {"no": 5, "ticket": "2602225", "date": "2026-02-22", "month": "Feb 2026", "month_num": 2, "customer": "GB", "type": "Visit", "category": "صيانة", "location": "prima - سنترال ابو رواش", "team": ["Eng. Mahmoud", "Eng. Omar", "Fawzy"], "car": true, "problem": "link down", "solved": "change Surge", "status": "تمت الزيارة"}, {"no": 6, "ticket": "2602246", "date": "2026-02-24", "month": "Feb 2026", "month_num": 2, "customer": "GB", "type": "Visit", "category": "تركيب", "location": "GB Attaka - سنترال عتاقه 2", "team": ["Eng. Omar", "Belel", "Belal Hosny", "Momya", "Fawzy"], "car": true, "problem": "Replace link AN-80 to RDL 3000 Edge", "solved": "Installation is incomplete and we are awaiting authorization to complete it.", "status": "تم بنجاح"}, {"no": 7, "ticket": "2603087", "date": "2026-03-01", "month": "Mar 2026", "month_num": 3, "customer": "Global napy", "type": "Visit", "category": "استلام", "location": "وسط البلد", "team": ["Eng. Omar"], "car": true, "problem": "", "solved": "intercom استلام من شركه hikvition وسط البلد", "status": "تمت الزيارة"}, {"no": 8, "ticket": "2603088", "date": "2026-03-08", "month": "Mar 2026", "month_num": 3, "customer": "GB", "type": "Visit", "category": "تركيب", "location": "GB Attaka - سنترال عتاقه 2", "team": ["Eng. Omar", "Belel", "Belal Hosny", "Fawzy"], "car": true, "problem": "Replace link AN-80 to RDL 3000 Edge", "solved": "installation Complete", "status": "تم بنجاح"}, {"no": 9, "ticket": "2603099", "date": "2026-03-09", "month": "Mar 2026", "month_num": 3, "customer": "CIB", "type": "Visit", "category": "صيانة", "location": "cib fuc", "team": ["Eng. Omar", "Belel", "Belal Hosny"], "car": true, "problem": "link down", "solved": "change Fr and Config", "status": "تمت الزيارة"}, {"no": 10, "ticket": "26031810", "date": "2026-03-18", "month": "Mar 2026", "month_num": 3, "customer": "Global napy", "type": "Visit", "category": "معاينة / مسح", "location": "المنطقة الصناعية 6th of October City", "team": ["Eng. Omar", "Belal Hosny"], "car": true, "problem": "non", "solved": "done", "status": "تم بنجاح"}, {"no": 11, "ticket": "26032611", "date": "2026-03-26", "month": "Mar 2026", "month_num": 3, "customer": "GB", "type": "Visit", "category": "صيانة", "location": "قطامية", "team": ["Eng. Omar", "Belal Hosny"], "car": true, "problem": "link down", "solved": "change DC power injector (not solved)", "status": "قيد الانتظار / معلق"}, {"no": 12, "ticket": "26032912", "date": "2026-03-29", "month": "Mar 2026", "month_num": 3, "customer": "Global napy", "type": "Visit", "category": "تركيب", "location": "المنطقة الصناعية 6th of October City", "team": ["Eng. Omar", "Belel"], "car": false, "problem": "intercom install", "solved": "installation Complete", "status": "تم بنجاح"}, {"no": 13, "ticket": "26032913", "date": "2026-03-29", "month": "Mar 2026", "month_num": 3, "customer": "GB", "type": "Visit", "category": "صيانة", "location": "قطامية", "team": ["Eng. Mahmoud", "Belal Hosny", "Fawzy"], "car": true, "problem": "link down( تكميليه ل)( #26032611#)", "solved": "(solver)change surge proction", "status": "تمت الزيارة"}, {"no": 14, "ticket": "26033014", "date": "2026-03-30", "month": "Mar 2026", "month_num": 3, "customer": "MAC", "type": "Visit", "category": "معاينة / مسح", "location": "العاشر من رمضان", "team": ["Eng. Omar", "Belel"], "car": true, "problem": "non", "solved": "done", "status": "تم بنجاح"}, {"no": 15, "ticket": "26040115", "date": "2026-04-01", "month": "Apr 2026", "month_num": 4, "customer": "فيلا الدكتور", "type": "Visit", "category": "صيانة", "location": "الحى الثامن 6 اكتوبر", "team": ["Eng. Omar", "Belel"], "car": false, "problem": "Power Down", "solved": "changing power adapter", "status": "تمت الزيارة"}, {"no": 16, "ticket": "26040516", "date": "2026-04-05", "month": "Apr 2026", "month_num": 4, "customer": "النساجون", "type": "Visit", "category": "صيانة", "location": "العاشر من رمضان", "team": ["Eng. Mahmoud", "Eng. Omar", "Belel", "Belal Hosny"], "car": true, "problem": "surge damge", "solved": "solved by chage surge", "status": "تمت الزيارة"}, {"no": 17, "ticket": "26040817", "date": "2026-04-08", "month": "Apr 2026", "month_num": 4, "customer": "CIB", "type": "Remotely", "category": "صيانة", "location": "سنترال التجمع - جامعة فيوتشر", "team": ["Eng. Mahmoud"], "car": false, "problem": "اعادة تشغيل البور", "solved": "", "status": "تمت الزيارة"}, {"no": 18, "ticket": "26040918", "date": "2026-04-09", "month": "Apr 2026", "month_num": 4, "customer": "CIB", "type": "Remotely", "category": "صيانة", "location": "سنترال التجمع - جامعة فيوتشر", "team": ["Eng. Mahmoud"], "car": false, "problem": "تغير تردد", "solved": "", "status": "تمت الزيارة"}, {"no": 19, "ticket": "26041919", "date": "2026-04-19", "month": "Apr 2026", "month_num": 4, "customer": "EDITA", "type": "Visit", "category": "صيانة", "location": "القطامية", "team": ["Eng. Mahmoud", "Belel", "Belal Hosny", "Fawzy"], "car": true, "problem": "link down", "solved": "wire change", "status": "تمت الزيارة"}, {"no": 20, "ticket": "26042018", "date": "2026-04-20", "month": "Apr 2026", "month_num": 4, "customer": "GB", "type": "Visit", "category": "صيانة", "location": "السويس", "team": ["Eng. Omar", "Belel", "Fawzy"], "car": true, "problem": "non stable signal", "solved": "not solved", "status": "قيد الانتظار / معلق"}, {"no": 21, "ticket": "26042121", "date": "2026-04-21", "month": "Apr 2026", "month_num": 4, "customer": "GB", "type": "Visit", "category": "صيانة", "location": "السويس", "team": ["Eng. Mahmoud", "Belel", "Fawzy"], "car": true, "problem": "non stable signal((تكميليه )(#26042018#))", "solved": "solver by change ip", "status": "تمت الزيارة"}, {"no": 22, "ticket": "26042322", "date": "2026-04-23", "month": "Apr 2026", "month_num": 4, "customer": "EDITA", "type": "Visit", "category": "صيانة", "location": "العاشر من رمضان", "team": ["Eng. Omar", "Belel", "Belal Hosny", "Fawzy"], "car": true, "problem": "link down", "solved": "change surge and cable", "status": "تمت الزيارة"}, {"no": 23, "ticket": "26042323", "date": "2026-04-23", "month": "Apr 2026", "month_num": 4, "customer": "EDITA", "type": "Visit", "category": "صيانة", "location": "القطاميه", "team": ["Eng. Omar", "Belel", "Belal Hosny", "Fawzy"], "car": true, "problem": "non stable signal", "solved": "change power", "status": "تمت الزيارة"}, {"no": 24, "ticket": "26042824", "date": "2026-04-28", "month": "Apr 2026", "month_num": 4, "customer": "MAC", "type": "Visit", "category": "معاينة / مسح", "location": "العاشر من رمضان", "team": ["Eng. Mahmoud", "Eng. Omar", "Belel"], "car": true, "problem": "", "solved": "", "status": "تمت الزيارة"}, {"no": 25, "ticket": "26042925", "date": "2026-04-29", "month": "Apr 2026", "month_num": 4, "customer": "eni", "type": "Visit", "category": "صيانة", "location": "دمياط", "team": ["Eng. Mahmoud", "Eng. Omar", "Belel", "Fawzy"], "car": true, "problem": "link down", "solved": "change antenna", "status": "تمت الزيارة"}, {"no": 26, "ticket": "26050326", "date": "2026-05-03", "month": "May 2026", "month_num": 5, "customer": "البريد المصري", "type": "Visit", "category": "تركيب", "location": "شبرا", "team": ["Eng. Mahmoud", "Eng. Omar"], "car": false, "problem": "تركيب DEMO", "solved": "", "status": "تمت الزيارة"}, {"no": 27, "ticket": "26051227", "date": "2026-05-12", "month": "May 2026", "month_num": 5, "customer": "البريد المصري", "type": "Visit", "category": "تركيب", "location": "شبرا", "team": ["Eng. Omar"], "car": false, "problem": "تركيب DEMO", "solved": "", "status": "تمت الزيارة"}, {"no": 28, "ticket": "26051428", "date": "2026-05-14", "month": "May 2026", "month_num": 5, "customer": "eni", "type": "Visit", "category": "صيانة", "location": "المقطم", "team": ["Eng. Mahmoud", "Fawzy"], "car": true, "problem": "", "solved": "", "status": "تمت الزيارة"}, {"no": 29, "ticket": "26051429", "date": "2026-05-14", "month": "May 2026", "month_num": 5, "customer": "GB", "type": "Visit", "category": "معاينة / مسح", "location": "دمياط", "team": ["Belel"], "car": true, "problem": "", "solved": "", "status": "تمت الزيارة"}, {"no": 30, "ticket": "26051430", "date": "2026-05-14", "month": "May 2026", "month_num": 5, "customer": "البريد المصري", "type": "Visit", "category": "تركيب", "location": "شبرا", "team": ["Eng. Omar"], "car": false, "problem": "تركيب DEMO", "solved": "", "status": "تمت الزيارة"}, {"no": 31, "ticket": "26051931", "date": "2026-05-19", "month": "May 2026", "month_num": 5, "customer": "البريد المصري", "type": "Visit", "category": "تركيب", "location": "شبرا", "team": ["Eng. Omar"], "car": false, "problem": "", "solved": "", "status": "تمت الزيارة"}, {"no": 32, "ticket": "26052532", "date": "2026-05-24", "month": "May 2026", "month_num": 5, "customer": "GB", "type": "Visit", "category": "صيانة", "location": "قطامية", "team": ["Eng. Omar", "Fawzy"], "car": true, "problem": "un stable serves", "solved": "change surge,power and realignment", "status": "تمت الزيارة"}, {"no": 33, "ticket": "26060733", "date": "2026-06-07", "month": "Jun 2026", "month_num": 6, "customer": "GB", "type": "Visit", "category": "صيانة", "location": "السادات (مزرعة غابور)", "team": ["Eng. Omar", "Eng. Mohamed", "Belel", "Belal Hosny"], "car": true, "problem": "link down", "solved": "change Fr and Config", "status": "تمت الزيارة"}, {"no": 34, "ticket": "26060834", "date": "2026-06-08", "month": "Jun 2026", "month_num": 6, "customer": "GB", "type": "Visit", "category": "صيانة", "location": "قطامية", "team": ["Eng. Omar", "Eng. Mohamed", "Belel", "Belal Hosny"], "car": true, "problem": "un stable serves", "solved": "not solved due to customer cancellation", "status": "قيد الانتظار / معلق"}, {"no": 35, "ticket": "26061135", "date": "2026-06-11", "month": "Jun 2026", "month_num": 6, "customer": "GB", "type": "Visit", "category": "صيانة", "location": "قطامية - سنترال القطاميه", "team": ["Eng. Mahmoud", "Belel", "Belal Hosny", "Fawzy"], "car": true, "problem": "un stable serves", "solved": "Antenna Alignment And checking the Ethernet cable from Exchange, And test the Grounding system from client side", "status": "تمت الزيارة"}, {"no": 36, "ticket": "26061436", "date": "2026-06-14", "month": "Jun 2026", "month_num": 6, "customer": "GB", "type": "Visit", "category": "صيانة", "location": "أبو رواش", "team": ["Eng. Omar", "Eng. Mohamed", "Belel", "Belal Hosny"], "car": true, "problem": "link down", "solved": "change surge protection", "status": "تمت الزيارة"}, {"no": 37, "ticket": "26061637", "date": "2026-06-16", "month": "Jun 2026", "month_num": 6, "customer": "البريد المصري", "type": "Visit", "category": "تركيب", "location": "شبرا", "team": ["Eng. Omar", "Eng. Mohamed"], "car": false, "problem": "تركيب DEMO", "solved": "", "status": "تمت الزيارة"}, {"no": 38, "ticket": "26061738", "date": "2026-06-17", "month": "Jun 2026", "month_num": 6, "customer": "GB", "type": "Visit", "category": "صيانة", "location": "السادات (مصنع الهياكل)", "team": ["Eng. Mahmoud", "Belel", "Belal Hosny", "Fawzy"], "car": false, "problem": "link down", "solved": "change surge protection And Power Source", "status": "تمت الزيارة"}, {"no": 39, "ticket": "26062339", "date": "2026-06-23", "month": "Jun 2026", "month_num": 6, "customer": "GB", "type": "Visit", "category": "معاينة / مسح", "location": "دمياط", "team": ["Eng. Omar", "Fawzy"], "car": false, "problem": "", "solved": "", "status": "تمت الزيارة"}, {"no": 40, "ticket": "26062940", "date": "2026-06-29", "month": "Jun 2026", "month_num": 6, "customer": "MAC", "type": "Visit", "category": "معاينة / مسح", "location": "العاشر من رمضان - new mac", "team": ["Belel"], "car": false, "problem": "mast installation", "solved": "equipment deleivery", "status": "تمت الزيارة"}, {"no": 41, "ticket": "26071941", "date": "2026-07-19", "month": "Jul 2026", "month_num": 7, "customer": "MAC", "type": "Visit", "category": "تركيب", "location": "العاشر من رمضان", "team": ["Belel", "Belal Hosny", "Fawzy"], "car": true, "problem": "mast installation", "solved": "Installing the first part of the mast at the MAC factory", "status": "تمت الزيارة"}, {"no": 42, "ticket": "26072142", "date": "2026-07-21", "month": "Jul 2026", "month_num": 7, "customer": "MAC", "type": "Visit", "category": "تركيب", "location": "new mac", "team": ["Belel", "Fawzy"], "car": true, "problem": "mast installation", "solved": "Installing  the mast at the New MAC", "status": "تمت الزيارة"}, {"no": 43, "ticket": "26072243", "date": "2026-07-22", "month": "Jul 2026", "month_num": 7, "customer": "MAC", "type": "Visit", "category": "تركيب", "location": "العاشر من رمضان", "team": ["Belel", "Fawzy"], "car": true, "problem": "mast installation", "solved": "Installing the second part of the mast at the New MAC", "status": "تمت الزيارة"}, {"no": 44, "ticket": "26080444", "date": "2026-08-04", "month": "Aug 2026", "month_num": 8, "customer": "MAC", "type": "Visit", "category": "تركيب", "location": "العاشر من رمضان - new mac", "team": ["Eng. Mohamed", "Belel", "Fawzy"], "car": true, "problem": "cable laying", "solved": "Ethernet cables were run from the mast (tower) to the data center in both branches", "status": "تمت الزيارة"}, {"no": 45, "ticket": "26080645", "date": "2026-08-06", "month": "Aug 2026", "month_num": 8, "customer": "GB", "type": "Visit", "category": "صيانة", "location": "قطامية", "team": ["Eng. Mahmoud", "Eng. Mohamed", "Belel", "Fawzy"], "car": true, "problem": "link down (Repeated tripping of the device while operating on UPS power)", "solved": "Connected the device to the UPS with the ground isolated; currently operating normally without tripping", "status": "تمت الزيارة"}, {"no": 46, "ticket": "26080746", "date": "2026-08-07", "month": "Aug 2026", "month_num": 8, "customer": "MAC", "type": "Visit", "category": "تركيب", "location": "new mac - mac 1", "team": ["Eng. Omar", "Eng. Mohamed", "Belel", "Momya", "Fawzy"], "car": true, "problem": "Relocating the antennas and RDL-3000 devices from the old mast to the new mast at both sites.", "solved": "The antennas and devices were successfully relocated, and both sites are operating at optimal efficiency.", "status": "تمت الزيارة"}, {"no": 47, "ticket": "26081147", "date": "2026-08-11", "month": "Aug 2026", "month_num": 8, "customer": "EDITA", "type": "Visit", "category": "أخرى", "location": "قطامية", "team": ["Eng. Mohamed", "Belel"], "car": true, "problem": "استلام power injector", "solved": "The power injector and power cable have been received, and the customer has been cleared of responsibility.", "status": "تمت الزيارة"}, {"no": 48, "ticket": "26081148", "date": "2026-08-11", "month": "Aug 2026", "month_num": 8, "customer": "MAC", "type": "Visit", "category": "معاينة / مسح", "location": "mac2 - new mac", "team": ["Eng. Mohamed", "Belel"], "car": true, "problem": "قياس الارضى", "solved": "The grounding wells at both branches were inspected. An issue was identified at the New MAC branch, where the resistance measured 5.73 Ω, while the MAC 2 branch measured 0.37 Ω.", "status": "تمت الزيارة"}, {"no": 49, "ticket": "26082549", "date": "2026-08-25", "month": "Aug 2026", "month_num": 8, "customer": "CIB", "type": "Visit", "category": "صيانة", "location": "سنترال التجمع - جامعة فيوتشر", "team": ["Eng. Mohamed", "Belel", "Fawzy"], "car": true, "problem": "link down", "solved": "Checked the power adapter and cables; no issues were found. The frequency was changed, and both branches are operating efficiently.", "status": "تمت الزيارة"}, {"no": 50, "ticket": "26090350", "date": "2026-09-03", "month": "Sep 2026", "month_num": 9, "customer": "البريد المصري", "type": "Visit", "category": "تركيب", "location": "السبيل - العاصمة", "team": ["Eng. Omar", "Eng. Mohamed"], "car": true, "problem": "تركيب DEMO", "solved": "POC for operating Peplink devices", "status": "تمت الزيارة"}, {"no": 51, "ticket": "26090651", "date": "2026-09-06", "month": "Sep 2026", "month_num": 9, "customer": "GB", "type": "Visit", "category": "تركيب", "location": "new Domiaat", "team": ["Eng. Mohamed", "Fawzy"], "car": true, "problem": "Tower site preparation", "solved": "Tower site preparation, including installing tower foundation bases, anchor guys/guy-wires, and pouring foundation concrete", "status": "تمت الزيارة"}, {"no": 52, "ticket": "26090752", "date": "2026-09-07", "month": "Sep 2026", "month_num": 9, "customer": "GB", "type": "Visit", "category": "تركيب", "location": "new Domiaat", "team": ["Eng. Mohamed", "Fawzy"], "car": true, "problem": "Tower site preparation", "solved": "Tower site preparation, including installing tower foundation bases, anchor guys/guy-wires, and pouring foundation concrete", "status": "تمت الزيارة"}, {"no": 53, "ticket": "26090853", "date": "2026-09-08", "month": "Sep 2026", "month_num": 9, "customer": "GB", "type": "Visit", "category": "تركيب", "location": "new Domiaat", "team": ["Eng. Mohamed", "Fawzy"], "car": true, "problem": "Tower site preparation", "solved": "Tower site preparation, including installing tower foundation bases, anchor guys/guy-wires, and pouring foundation concrete", "status": "تمت الزيارة"}, {"no": 54, "ticket": "26091154", "date": "2026-09-11", "month": "Sep 2026", "month_num": 9, "customer": "GB", "type": "Visit", "category": "تركيب", "location": "new Domiaat", "team": ["Fawzy", "Yehia"], "car": false, "problem": "Resuming the erection and installation of the tower, antenna, and cable laying.", "solved": "", "status": "تمت الزيارة"}, {"no": 55, "ticket": "26091655", "date": "2026-09-16", "month": "Sep 2026", "month_num": 9, "customer": "GB", "type": "Visit", "category": "معاينة / مسح", "location": "prima - GP Acadimic", "team": ["Eng. Omar", "Belel"], "car": true, "problem": "The site (under construction) was inspected, surrounding views were photographed, and the feasibility of installing a mast at this location was evaluated to ensure a clear Line of Sight (LOS) with the other tower", "solved": "", "status": "تمت الزيارة"}, {"no": 56, "ticket": "26092156", "date": "2026-09-21", "month": "Sep 2026", "month_num": 9, "customer": "GB", "type": "Visit", "category": "معاينة / مسح", "location": "prima - New GP", "team": ["Eng. Mohamed", "Belel"], "car": true, "problem": "The site (under construction) was inspected, surrounding views were photographed, and the feasibility of installing a mast at this location was evaluated to ensure a clear Line of Sight (LOS) with the other tower", "solved": "Upon inquiring about the new building's expected height, the client reported that it is currently unavailable. Therefore, a preliminary tower height of 15 meters from the ground level was assumed in the report, which is adjustable upon confirming the actual height", "status": "تمت الزيارة"}, {"no": 57, "ticket": "26101557", "date": "2026-10-15", "month": "Oct 2026", "month_num": 10, "customer": "GB", "type": "Visit", "category": "صيانة", "location": "prima - mazda", "team": ["Eng. Omar", "Eng. Mohamed", "Belel", "Fawzy", "Yehia"], "car": true, "problem": "The link is unstable", "solved": "A redirection was attempted, but the link works with maximum efficiency in its current setup", "status": "تمت الزيارة"}, {"no": 58, "ticket": "26101858", "date": "2026-10-18", "month": "Oct 2026", "month_num": 10, "customer": "GB", "type": "Visit", "category": "تركيب", "location": "branch - New Damietta Exchange", "team": ["Eng. Omar", "Eng. Mohamed", "Belel", "Fawzy", "Yehia"], "car": true, "problem": "", "solved": "The antenna was installed, the outdoor unit was mounted, and the cables(95m) were routed to the server room", "status": "تمت الزيارة"}, {"no": 59, "ticket": "26102059", "date": "2026-10-20", "month": "Oct 2026", "month_num": 10, "customer": "GB", "type": "Visit", "category": "تركيب", "location": "branch - New Damietta Exchange", "team": ["Eng. Omar", "Eng. Mohamed", "Belel", "Fawzy", "Yehia"], "car": true, "problem": "", "solved": "The antennas were aligned and the link was tested, but a software issue occurred on one of the devices. We are waiting to revisit the site once the issue is resolved.", "status": "تمت الزيارة"}, {"no": 60, "ticket": "26102660", "date": "2026-10-20", "month": "Oct 2026", "month_num": 10, "customer": "GB", "type": "Visit", "category": "تركيب", "location": "branch - New Damietta Exchange", "team": ["Eng. Mahmoud", "Belel", "Fawzy", "Yehia"], "car": true, "problem": "", "solved": "The antennas were aligned and the link was tested, but a software issue occurred on one of the devices. We are waiting to revisit the site once the issue is resolved.", "status": "تمت الزيارة"}];
+    let timelineChartInstance = null;
+    let categoryChartInstance = null;
+    let customerChartInstance = null;
+    let teamChartInstance = null;
+
+    function initDashboard() {
+      populateFilterOptions();
+      applyFilters();
+    }
+
+    function populateFilterOptions() {
+      const custSelect = document.getElementById('customerFilter');
+      const catSelect = document.getElementById('categoryFilter');
+
+      const customers = [...new Set(rawData.map(d => d.customer).filter(Boolean))].sort();
+      const categories = [...new Set(rawData.map(d => d.category).filter(Boolean))].sort();
+
+      customers.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        custSelect.appendChild(opt);
+      });
+
+      categories.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        catSelect.appendChild(opt);
+      });
+    }
+
+    function applyFilters() {
+      const selectedCust = document.getElementById('customerFilter').value;
+      const selectedCat = document.getElementById('categoryFilter').value;
+      const query = document.getElementById('searchInput').value.trim().toLowerCase();
+
+      const filtered = rawData.filter(d => {
+        const matchCust = (selectedCust === 'ALL' || d.customer === selectedCust);
+        const matchCat = (selectedCat === 'ALL' || d.category === selectedCat);
+        const matchQuery = !query || 
+          (d.customer && d.customer.toLowerCase().includes(query)) ||
+          (d.ticket && d.ticket.toLowerCase().includes(query)) ||
+          (d.problem && d.problem.toLowerCase().includes(query)) ||
+          (d.solved && d.solved.toLowerCase().includes(query)) ||
+          (d.location && d.location.toLowerCase().includes(query));
+        return matchCust && matchCat && matchQuery;
+      });
+
+      updateKPIs(filtered);
+      renderCharts(filtered);
+      renderTable(filtered);
+    }
+
+    function resetFilters() {
+      document.getElementById('customerFilter').value = 'ALL';
+      document.getElementById('categoryFilter').value = 'ALL';
+      document.getElementById('searchInput').value = '';
+      applyFilters();
+    }
+
+    function updateKPIs(data) {
+      const total = data.length;
+      const maint = data.filter(d => d.category === 'صيانة').length;
+      const installs = data.filter(d => d.category === 'تركيب').length;
+      const customersCount = new Set(data.map(d => d.customer).filter(Boolean)).size;
+      const carCount = data.filter(d => d.car).length;
+
+      document.getElementById('kpi-total').textContent = total;
+      document.getElementById('kpi-maintenance').textContent = maint;
+      document.getElementById('kpi-maintenance-pct').textContent = total > 0 ? `${Math.round((maint / total) * 100)}% من الإجمالي` : '0%';
+
+      document.getElementById('kpi-installs').textContent = installs;
+      document.getElementById('kpi-installs-pct').textContent = total > 0 ? `${Math.round((installs / total) * 100)}% من الإجمالي` : '0%';
+
+      document.getElementById('kpi-customers').textContent = customersCount;
+      document.getElementById('kpi-car').textContent = carCount;
+      document.getElementById('kpi-car-pct').textContent = total > 0 ? `${Math.round((carCount / total) * 100)}% من المهام` : '0%';
+    }
+
+    function renderCharts(data) {
+      // 1. Timeline Chart
+      const monthsOrder = ['Jan 2026', 'Feb 2026', 'Mar 2026', 'Apr 2026', 'May 2026', 'Jun 2026', 'Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026', 'Nov 2026', 'Dec 2026'];
+      const monthCounts = {};
+      monthsOrder.forEach(m => monthCounts[m] = 0);
+      data.forEach(d => {
+        if (monthCounts[d.month] !== undefined) {
+          monthCounts[d.month]++;
+        }
+      });
+      const activeMonths = monthsOrder.filter(m => monthCounts[m] > 0 || ['Jan 2026', 'Feb 2026', 'Mar 2026', 'Apr 2026', 'May 2026', 'Jun 2026', 'Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026'].includes(m));
+
+      const ctxTimeline = document.getElementById('timelineChart').getContext('2d');
+      if (timelineChartInstance) timelineChartInstance.destroy();
+      timelineChartInstance = new Chart(ctxTimeline, {
+        type: 'line',
+        data: {
+          labels: activeMonths,
+          datasets: [{
+            label: 'عدد الزيارات',
+            data: activeMonths.map(m => monthCounts[m]),
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56, 189, 248, 0.15)',
+            tension: 0.35,
+            fill: true,
+            pointBackgroundColor: '#38bdf8',
+            pointRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', stepSize: 2 } },
+            x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+          }
+        }
+      });
+
+      // 2. Category Mix
+      const catCounts = {};
+      data.forEach(d => {
+        catCounts[d.category] = (catCounts[d.category] || 0) + 1;
+      });
+
+      const ctxCat = document.getElementById('categoryChart').getContext('2d');
+      if (categoryChartInstance) categoryChartInstance.destroy();
+      categoryChartInstance = new Chart(ctxCat, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(catCounts),
+          datasets: [{
+            data: Object.values(catCounts),
+            backgroundColor: ['#f43f5e', '#10b981', '#6366f1', '#a855f7', '#06b6d4'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { family: 'Cairo' } } }
+          },
+          cutout: '65%'
+        }
+      });
+
+      // 3. Customer Visits
+      const custCounts = {};
+      data.forEach(d => {
+        if (d.customer) custCounts[d.customer] = (custCounts[d.customer] || 0) + 1;
+      });
+      const sortedCusts = Object.entries(custCounts).sort((a, b) => b[1] - a[1]).slice(0, 7);
+
+      const ctxCust = document.getElementById('customerChart').getContext('2d');
+      if (customerChartInstance) customerChartInstance.destroy();
+      customerChartInstance = new Chart(ctxCust, {
+        type: 'bar',
+        data: {
+          labels: sortedCusts.map(c => c[0]),
+          datasets: [{
+            label: 'الزيارات',
+            data: sortedCusts.map(c => c[1]),
+            backgroundColor: '#fbbf24',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8' } },
+            y: { grid: { display: false }, ticks: { color: '#cbd5e1', font: { family: 'Cairo' } } }
+          }
+        }
+      });
+
+      // 4. Team Activity
+      const teamCounts = {};
+      data.forEach(d => {
+        d.team.forEach(m => {
+          teamCounts[m] = (teamCounts[m] || 0) + 1;
+        });
+      });
+      const sortedTeam = Object.entries(teamCounts).sort((a, b) => b[1] - a[1]);
+
+      const ctxTeam = document.getElementById('teamChart').getContext('2d');
+      if (teamChartInstance) teamChartInstance.destroy();
+      teamChartInstance = new Chart(ctxTeam, {
+        type: 'bar',
+        data: {
+          labels: sortedTeam.map(t => t[0]),
+          datasets: [{
+            label: 'مأموريات',
+            data: sortedTeam.map(t => t[1]),
+            backgroundColor: '#818cf8',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8' } },
+            x: { grid: { display: false }, ticks: { color: '#cbd5e1', font: { family: 'Cairo' } } }
+          }
+        }
+      });
+    }
+
+    function renderTable(data) {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-6 text-slate-500">لا توجد بيانات مطابقة لخيارات البحث أو الفلتر</td></tr>`;
+        return;
+      }
+
+      data.forEach(d => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-800/40 transition";
+
+        let statusClass = "bg-slate-700 text-slate-300";
+        if (d.status === "تم بنجاح") statusClass = "bg-emerald-950 text-emerald-400 border border-emerald-800";
+        else if (d.status.includes("معلق")) statusClass = "bg-rose-950 text-rose-400 border border-rose-800";
+
+        let catBadge = "bg-slate-700 text-slate-300";
+        if (d.category === 'صيانة') catBadge = "bg-rose-900/40 text-rose-300 border border-rose-800/60";
+        else if (d.category === 'تركيب') catBadge = "bg-emerald-900/40 text-emerald-300 border border-emerald-800/60";
+        else catBadge = "bg-indigo-900/40 text-indigo-300 border border-indigo-800/60";
+
+        tr.innerHTML = `
+          <td class="p-3 text-slate-400 font-mono">${d.no}</td>
+          <td class="p-3 font-semibold text-cyan-300 font-mono">#${d.ticket}</td>
+          <td class="p-3 whitespace-nowrap">${d.date}</td>
+          <td class="p-3 font-bold text-white">${d.customer || '-'}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-[11px] ${d.type === 'Visit' ? 'bg-sky-900/60 text-sky-300' : 'bg-amber-900/60 text-amber-300'}">${d.type}</span></td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-[11px] ${catBadge}">${d.category}</span></td>
+          <td class="p-3 text-slate-300 max-w-xs truncate" title="${d.location}">${d.location || '-'}</td>
+          <td class="p-3 text-slate-300">
+            <div class="flex flex-wrap gap-1">
+              ${d.team.map(t => `<span class="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded text-[10px]">${t}</span>`).join('')}
+              ${d.car ? '<span class="bg-blue-900/50 text-blue-300 px-1.5 py-0.5 rounded text-[10px]">🚗 سيارة</span>' : ''}
+            </div>
+          </td>
+          <td class="p-3 text-slate-300 max-w-xs">
+            <div class="font-medium text-slate-200 truncate" title="${d.problem}">${d.problem || '-'}</div>
+            <div class="text-[11px] text-slate-400 truncate" title="${d.solved}">${d.solved || ''}</div>
+          </td>
+          <td class="p-3 whitespace-nowrap"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusClass}">${d.status}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Auto run on load
+    window.addEventListener('DOMContentLoaded', initDashboard);
+  </script>
+</body>
+</html>
